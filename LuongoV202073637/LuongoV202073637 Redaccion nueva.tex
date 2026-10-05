@@ -1,0 +1,281 @@
+\documentclass[letter, 10pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish, es-nodecimaldot, es-tabla, es-noquoting]{babel}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage[dvips]{graphicx}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{babel}
+\usepackage[top=3cm,bottom=3cm,left=3.5cm,right=3.5cm,footskip=1.5cm,headheight=1.5cm,headsep=.5cm,textheight=3cm]{geometry}
+
+\newcommand{\R}{\mathbb{R}}
+% Línea gris separadora entre restricciones (usar después de \\ en align)
+\newcommand{\sepline}{\noalign{\vskip 3pt{\color{gray!40}\hrule height 0.4pt}\vskip 3pt}}
+
+\begin{document}
+\title{Inteligencia Artificial \\ \begin{Large}Estado del Arte: Problema de Programación de Conductores de Buses (\emph{Bus Driver Scheduling Problem}, BDSP)\end{Large}}
+\author{Vicente Luongo \\ ROL: 202073637-5}
+\date{\today}
+\maketitle
+
+
+%--------------------No borrar esta secci\'on--------------------------------%
+\section*{Evaluaci\'on}
+
+\begin{tabular}{ll}
+Resumen (5\%): & \underline{\hspace{2cm}} \\
+Introducci\'on (5\%):  & \underline{\hspace{2cm}} \\
+Definici\'on del Problema (10\%):  & \underline{\hspace{2cm}} \\
+Estado del Arte (40\%):  & \underline{\hspace{2cm}} \\
+Modelo Matem\'atico (20\%): &  \underline{\hspace{2cm}}\\
+Conclusiones (15\%): &  \underline{\hspace{2cm}}\\
+Bibliograf\'ia (5\%): & \underline{\hspace{2cm}}\\
+ &  \\
+\textbf{Nota Final (100\%)}:   & \underline{\hspace{2cm}}
+\end{tabular}
+%---------------------------------------------------------------------------%
+\vspace{2cm}
+
+
+\begin{abstract}
+El \emph{Bus Driver Scheduling Problem} (BDSP) consiste en construir los turnos diarios de trabajo de los conductores de una empresa de transporte público, de modo que cada tramo de recorrido de los buses sea cubierto exactamente por un conductor, respetando la legislación laboral y los convenios colectivos. Se trata de un problema de optimización combinatoria NP-duro, cuyo costo impacta directamente en la operación de las empresas, dado que la mano de obra constituye una de sus principales partidas de gasto. En este documento se define el problema y la variante a estudiar, cuyo objetivo es minimizar el tiempo pagado total bajo reglas de descanso, sobretiempo, trabajo nocturno, tiempo mínimo pagado y duración máxima del turno. Se revisa la literatura desde los modelos clásicos de partición y cobertura de conjuntos hasta las metaheurísticas y los enfoques híbridos recientes, y se propone un modelo de programación lineal entera mixta que captura todas las reglas de la variante estudiada.
+\end{abstract}
+
+\section{Introducci\'on}
+La planificación de un sistema de transporte público por buses suele dividirse en varios subproblemas encadenados: diseño de la red, construcción de itinerarios (\emph{timetabling}), programación de vehículos (\emph{vehicle scheduling}), programación de tripulaciones (\emph{crew scheduling}) y asignación de turnos a personas concretas en un horizonte de semanas (\emph{crew rostering})~\cite{IbarraRojas2015,DeLeone2011a}. El BDSP ocupa justamente la etapa de programación de tripulaciones: con el plan de vehículos ya fijado, hay que formar los turnos (\emph{duties}) que cubran todo el trabajo de conducción de un día.
+
+El interés por este problema es ante todo económico y legal. Los conductores representan uno de los componentes más pesados del costo operacional de una empresa de transporte~\cite{WrenRousseau1995}, y una asignación mal hecha se traduce en horas extraordinarias, tiempos muertos pagados y más conductores de los necesarios. A la vez, los turnos deben cumplir reglas laborales estrictas (descansos mínimos, jornada máxima, recargos por trabajo nocturno), lo que convierte la construcción manual de turnos en una tarea lenta y difícil de optimizar. Sumado a eso, el problema es NP-duro incluso en versiones muy simplificadas~\cite{Fischetti1987,Fischetti1989}, lo que explica el interés por técnicas de inteligencia artificial e investigación de operaciones.
+
+Este informe presenta el estado del arte del BDSP y formula un modelo matemático para la variante asignada en el curso, basada en las reglas de una empresa brasileña descritas por Constantino et al.~\cite{Constantino2017}. La organización es la siguiente: la Sección~\ref{sec:def} define el problema, su terminología, la variante estudiada y los problemas relacionados; la Sección~\ref{sec:eda} revisa los principales métodos de resolución propuestos en la literatura; la Sección~\ref{sec:modelo} presenta dos modelos matemáticos, uno general y otro específico para la variante estudiada; y la Sección~\ref{sec:conc} expone las conclusiones del estudio.
+
+\section{Definici\'on del Problema}\label{sec:def}
+
+\subsection{Terminología}
+El BDSP recibe como entrada la programación de vehículos, es decir, la secuencia de viajes que realiza cada bus durante el día (su \emph{bloque}). A lo largo de cada bloque hay \emph{puntos de relevo} (\emph{relief opportunities}): pares lugar--instante en que un conductor puede dejar el vehículo y otro tomarlo. El trabajo entre dos puntos de relevo consecutivos se llama \emph{tarea} o \emph{tramo}, y es la unidad mínima e indivisible de trabajo que se asigna a un conductor~\cite{Constantino2017}. Las paradas intermedias de un tramo dan igual, pues solo afectan su duración.
+
+Un \emph{turno} (\emph{duty}) es la secuencia ordenada de tramos que realiza un conductor en un día. Se llama \emph{spreadover} al tiempo transcurrido entre el inicio del primer tramo y el término del último. Entre dos tramos consecutivos de un turno puede haber una pausa, que puede ser un \emph{descanso} (no pagado, típicamente destinado a alimentación) o un \emph{tiempo ocioso} (pagado). Una secuencia de tramos trabajados sin un descanso intermedio recibe el nombre de \emph{stretch}~\cite{Constantino2017,DeLeone2011a}.
+
+\subsection{Descripción general}
+En términos generales, el BDSP busca un conjunto de turnos tal que:
+\begin{itemize}
+\item \textbf{Cobertura:} cada tramo es realizado por exactamente un conductor; no se permite que dos conductores compartan un tramo ni que un tramo quede sin cubrir.
+\item \textbf{Continuidad temporal y espacial:} un conductor solo puede comenzar un tramo si ya terminó el anterior y si se encuentra en el lugar donde este comienza. Sí puede cambiar de bus o de línea en cualquier punto de relevo.
+\item \textbf{Factibilidad laboral:} cada turno cumple las reglas de la legislación y de los convenios (descansos, jornada, sobretiempo, etc.).
+\item \textbf{Optimalidad:} se minimiza el costo total, usualmente medido como el tiempo pagado a los conductores, el número de conductores o una combinación de ambos.
+\end{itemize}
+Las \emph{variables} del problema corresponden, por lo tanto, a qué conductor realiza cada tramo (lo que determina implícitamente la secuencia de cada turno), y las decisiones derivadas de ello: cuál pausa se considera descanso, cuánto sobretiempo se genera, etc.
+
+\subsection{Variante estudiada}\label{sec:variante}
+La variante asignada corresponde a la estudiada por Constantino et al.~\cite{Constantino2017}, con reglas provenientes de la legislación laboral brasileña y los convenios sindicales de una empresa de transporte urbano. Cada tramo queda descrito por su línea, punto de partida, punto de término, hora de partida, duración y bus. Las reglas, parametrizadas en cada instancia, son las siguientes (entre paréntesis, los valores del caso de referencia):
+\begin{enumerate}
+\item \textbf{Stretch máximo y descanso mínimo.} Un conductor no puede trabajar más de $T^{\max}$ (360 min) sin un descanso; si el turno excede ese tiempo, debe incluir un descanso de al menos $R^{\min}$ (90 min).
+\item \textbf{Umbral de descanso pagado.} El descanso no se paga hasta un umbral $R^{\text{pag}}$ (300 min); el exceso por sobre él se considera tiempo ocioso y se paga.
+\item \textbf{Tiempo pagado mínimo.} Todo turno se paga por al menos $P^{\min}$ (432 min), aunque el trabajo efectivo sea menor.
+\item \textbf{Sobretiempo.} El tiempo trabajado por sobre la jornada normal es sobretiempo, no puede superar $O^{\max}$ (120 min) y recibe un recargo de $\beta_O$ (50\%).
+\item \textbf{Trabajo nocturno.} La conducción entre las 22:00 y las 05:00 se corrige por un factor $f_N$ (60/52, es decir, 52 minutos trabajados se cuentan como 60) y recibe un recargo de $\beta_N$ (20\%).
+\item \textbf{Duración máxima del turno.} El spreadover, incluyendo descansos no pagados, no puede superar $S^{\max}$ (780 min).
+\item \textbf{Cambio de línea.} Los cambios de línea dentro de un turno están permitidos, pero se penalizan con $p_L$ (1 min) cada uno.
+\end{enumerate}
+El objetivo es minimizar el tiempo pagado total de todos los conductores más las penalizaciones por cambio de línea. Nótese que, a diferencia de otras variantes, el número de conductores no se minimiza explícitamente; sin embargo, la regla del tiempo pagado mínimo induce a usar pocos turnos bien aprovechados.
+
+La Figura~\ref{fig:ejemplo} muestra la instancia de ejemplo entregada en el curso, con seis tramos de dos líneas. Un único conductor no podría cubrirlos todos, pues el spreadover resultante (05:50--20:35, 885 min) excede $S^{\max}$. La solución natural usa dos conductores, uno por bus, cada uno con menos de 200 minutos de trabajo; por la regla de tiempo mínimo, cada uno se paga 432 minutos, lo que da un costo de 864. El ejemplo ilustra cómo el tiempo mínimo pagado y el tiempo ocioso dominan el costo cuando los turnos son cortos.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=0.58cm,y=1cm,font=\scriptsize]
+  % franjas nocturnas
+  \fill[gray!20] (0,-0.4) rectangle (1,2.0);
+  \fill[gray!20] (18,-0.4) rectangle (19,2.0);
+  \node[gray] at (0.5,2.2) {noche};
+  \node[gray] at (18.5,2.2) {noche};
+  % eje de tiempo (horas 4 a 23)
+  \draw[->] (0,-0.4) -- (19.3,-0.4);
+  \foreach \h in {4,6,...,22} {
+    \draw (\h-4,-0.45) -- (\h-4,-0.35);
+    \node[below] at (\h-4,-0.45) {\h:00};
+  }
+  % filas de buses
+  \node[left] at (0,1.3) {Bus 242 (línea 202)};
+  \node[left] at (0,0.4) {Bus 98 (línea 235)};
+  % tramos bus 242: 5 (05:50-06:00), 6 (06:00-07:20)
+  \draw[fill=teal!40] (1.833,1.1) rectangle (2.0,1.5);
+  \draw[fill=teal!40] (2.0,1.1) rectangle (3.333,1.5);
+  \node[above] at (1.8,1.5) {5};
+  \node[above] at (2.67,1.5) {6};
+  \node[below] at (1.833,1.1) {G};
+  \node[below] at (2.35,1.1) {T};
+  \node[below] at (3.333,1.1) {T};
+  % tramos bus 98: 1 (17:20-17:35), 2 (17:35-18:40), 3 (18:40-19:50), 4 (19:50-20:35)
+  \draw[fill=orange!40] (13.333,0.2) rectangle (13.583,0.6);
+  \draw[fill=orange!40] (13.583,0.2) rectangle (14.667,0.6);
+  \draw[fill=orange!40] (14.667,0.2) rectangle (15.833,0.6);
+  \draw[fill=orange!40] (15.833,0.2) rectangle (16.583,0.6);
+  \node[above] at (13.3,0.6) {1};
+  \node[above] at (14.12,0.6) {2};
+  \node[above] at (15.25,0.6) {3};
+  \node[above] at (16.2,0.6) {4};
+  \node[below] at (13.2,0.2) {G};
+  \node[below] at (13.75,0.2) {T};
+  \node[below] at (14.667,0.2) {T};
+  \node[below] at (15.833,0.2) {T};
+  \node[below] at (16.583,0.2) {G};
+\end{tikzpicture}
+\caption{Instancia de ejemplo del curso: seis tramos sobre dos buses. Las letras indican los puntos de relevo (G: garaje, T: terminal) y las zonas grises, el horario nocturno.}
+\label{fig:ejemplo}
+\end{figure}
+
+\subsection{Problemas relacionados y variantes}
+El BDSP forma parte de la familia de problemas de \emph{crew scheduling}, en la que también entran la programación de tripulaciones aéreas y ferroviarias; en todos ellos hay que cubrir tareas con secuencias factibles de trabajo, aunque las reglas y la escala cambian. Está muy ligado al \emph{vehicle scheduling}, que determina los bloques, y al \emph{crew rostering}, que encadena los turnos diarios en calendarios semanales o mensuales considerando aspectos de calidad de vida~\cite{IbarraRojas2015}. En lo teórico, se relaciona con el \emph{fixed job scheduling} con restricciones de spreadover y de tiempo de trabajo, cuya NP-dureza demostraron Fischetti et al.~\cite{Fischetti1987,Fischetti1989}.
+
+Las variantes más conocidas del BDSP se diferencian en: (i) el \emph{objetivo}, que puede ser minimizar el número de conductores (versión \emph{unicost})~\cite{Yunes2005}, el costo total~\cite{Constantino2017}, o ambos, incluso de forma multiobjetivo~\cite{Lourenco2001}; (ii) el \emph{alcance}, pues algunas versiones resuelven la programación de vehículos y conductores de forma integrada~\cite{Huisman2005}; (iii) la existencia de uno o varios \emph{depósitos}, con la exigencia de terminar el turno en el depósito de partida~\cite{DeLeone2011a}; (iv) la separación por línea frente a un enfoque de red, en que un conductor puede cambiar de línea~\cite{Portugal2009,Constantino2017}; y (v) la complejidad de las reglas de pausas, como en el caso austriaco estudiado por Kletzander y Musliu~\cite{Kletzander2020}.
+
+\section{Estado del Arte}\label{sec:eda}
+
+\subsection{Origen y primeros enfoques}
+El BDSP lleva décadas siendo objeto de estudio en la literatura de investigación de operaciones, desde los años sesenta~\cite{Constantino2017}. Ya en 1983, la revisión de Bodin et al.~\cite{Bodin1983} ofrecía un panorama amplio de la programación de vehículos y tripulaciones, y los avances posteriores se difundieron sobre todo en la serie de conferencias \emph{Computer-Aided Scheduling of Public Transport} (hoy CASPT)~\cite{Constantino2017}. Wren y Rousseau~\cite{WrenRousseau1995} describen el problema y repasan los distintos enfoques de resolución disponibles a mediados de los noventa. Desde entonces, la literatura se ha bifurcado en dos grandes líneas: los métodos de programación matemática, en particular sobre modelos de partición y cobertura de conjuntos, y las heurísticas y metaheurísticas que trabajan directamente sobre los turnos~\cite{Constantino2017}.
+
+\subsection{Métodos exactos basados en partición y cobertura de conjuntos}
+La formulación más empleada es la de \emph{set partitioning} (SPP) o \emph{set covering} (SCP): cada columna de la matriz representa un turno factible y cada fila un tramo; se busca el subconjunto de columnas de costo mínimo que cubre cada fila exactamente una vez (SPP) o al menos una vez (SCP)~\cite{Portugal2009,DeLeone2011a}. Su gran ventaja es que toda la complejidad de las reglas laborales queda encapsulada en la generación de columnas, de modo que el modelo es independiente de la legislación. Su gran desventaja es que el número de turnos posibles crece de manera exponencial con el número de tramos.
+
+Para sortear esa dificultad se han seguido dos caminos. El primero es enumerar a priori un subconjunto acotado de turnos válidos y resolver el SCP sobre él, como en el sistema TRACS~II, que además genera nuevas columnas a partir de ese conjunto enumerado, aunque solo en el nodo raíz del árbol de ramificación~\cite{Fores2002}. El segundo es la \emph{generación de columnas} (CG), introducida para este problema por Desrochers y Soumis~\cite{DesrochersSoumis1989}, que descompone el problema en un SCP maestro, que selecciona turnos entre los ya conocidos, y un subproblema de camino más corto, que genera nuevos turnos que mejoran la solución. Yunes et al.~\cite{Yunes2005} combinaron CG con programación por restricciones para resolver instancias reales de hasta 246 tareas minimizando el número de conductores, y Chen y Shen~\cite{ChenShen2013} propusieron un algoritmo de CG mejorado aplicado a instancias de hasta 701 viajes. Curtis et al.~\cite{Curtis1999} resolvieron un SPP restringido mediante programación por restricciones, usando la solución de la relajación lineal para guiar el orden de las variables y valores, lo que permite incorporar reglas no lineales. En el ámbito integrado, Huisman et al.~\cite{Huisman2005} resolvieron simultáneamente vehículos y conductores con múltiples depósitos mediante CG y relajación lagrangiana.
+
+Como alternativa a SPP/SCP, De Leone et al.~\cite{DeLeone2011a} propusieron un modelo compacto de programación entera en que las variables binarias indican qué tramo ocupa cada posición de cada turno, con restricciones explícitas de spreadover, tiempo de trabajo, cantidad de tiempos ociosos y retorno al depósito. Resuelto con CPLEX, el modelo encontró óptimos en instancias de hasta 25 tramos, pero en 70 tramos solo consiguió una primera solución factible para uno de los tres objetivos, lo que deja a la vista la limitación de los métodos exactos directos. Según la revisión de Constantino et al.~\cite{Constantino2017}, en general ningún trabajo había abordado instancias de más de 500 tareas mediante un enfoque exacto.
+
+\subsection{Metaheurísticas y heurísticas}
+Cuando las reglas son difíciles de expresar linealmente o las instancias son muy grandes, las metaheurísticas han sido la opción preferida. Las principales familias son:
+
+\textbf{Algoritmos genéticos.} Wren y Wren~\cite{WrenWren1995} propusieron uno de los primeros algoritmos genéticos para el problema, aplicado sobre la formulación de cobertura de conjuntos. Dias et al.~\cite{Dias2002} extendieron la formulación SPP/SCP con un algoritmo genético capaz de considerar varios criterios de calidad simultáneamente, y Li y Kwan~\cite{LiKwan2003} incorporaron lógica difusa para evaluar la calidad de los turnos dentro de un algoritmo genético, resolviendo instancias de hasta 613 tareas.
+
+\textbf{Búsqueda tabú.} Shen y Kwan~\cite{ShenKwan2001} desarrollaron HACS, una búsqueda tabú que opera directamente sobre los turnos, sin recurrir a la enumeración de columnas propia de SPP/SCP.
+
+\textbf{GRASP.} Lourenço et al.~\cite{Lourenco2001} usaron GRASP~\cite{FeoResende1995} tanto como método de resolución independiente como procedimiento interno de una búsqueda tabú y de algoritmos genéticos multiobjetivo. Su construcción es voraz, basada en el costo de los turnos, y su búsqueda local usa un vecindario de intercambio simple (\emph{1-exchange}); estas técnicas se incorporaron al sistema comercial GIST. De Leone et al.~\cite{DeLeone2011a} construyen cada turno agregando tramos compatibles desde una lista restringida de candidatos (RCL) ordenada por el tiempo de espera, y mejoran la solución con tres vecindarios: \emph{1-swap} (intercambio de dos tramos entre turnos), \emph{variable neighborhood swap} (intercambio de sufijos de turnos, que permite fusionar turnos y reducir su número) y una generalización a $\rho$ puntos de corte. En instancias reales de hasta 161 viajes, GRASP obtuvo en segundos soluciones comparables, y en varios casos mejores, que un método exacto basado en SCP con columnas truncadas, que requería desde minutos hasta horas. Sobre las instancias aleatorias de Huisman et al.~\cite{Huisman2005}, además, obtuvo en promedio menos conductores, aunque con tipos de turno distintos, por lo que la comparación no es directa. Los mismos autores propusieron variantes multiarranque aleatorizadas~\cite{DeLeone2011b}, y la hibridación de GRASP con \emph{rollout} permitió resolver instancias de 250 tareas~\cite{DAnnibale2007,Constantino2017}.
+
+\textbf{Búsqueda en vecindario variable e hiperheurísticas.} Ma et al.~\cite{Ma2016} emplearon VNS en un caso real de Beijing con 501 tareas, y Li et al.~\cite{Li2015} propusieron una hiperheurística basada en CG para instancias reales de 500 tareas.
+
+\textbf{Heurística de múltiples asignaciones.} Constantino et al.~\cite{Constantino2017} proponen GraphBDSP, un algoritmo determinista que representa los tramos como vértices de un grafo multipartito dirigido y acíclico, donde los arcos indican que un tramo puede seguir a otro. Los vértices se agrupan en capas de tramos mutuamente incompatibles, y cada turno es un camino en el grafo. En la fase constructiva, recorre las capas y en cada una resuelve un problema de asignación lineal entre los turnos parciales y los tramos de la capa. En la fase de mejora, corta todos los turnos en una misma capa y recombina las partes izquierdas con las derechas mediante un nuevo problema de asignación (lo que nunca empeora la solución), además de un procedimiento que intenta eliminar el sobretiempo de los turnos largos. La factibilidad se maneja asignando costo infinito a las combinaciones que violan alguna regla, mientras que los cambios de línea se tratan como una penalización en el costo. El algoritmo tiene un solo parámetro y resolvió una instancia real de 2.313 tareas en aproximadamente cuatro minutos. Los autores compararon además tres funciones de costo y encontraron que guiar la búsqueda por el tiempo ocioso y el sobretiempo da mejores resultados que usar directamente el tiempo pagado.
+
+\subsection{Mejores resultados y tendencia actual}
+Por la diversidad de reglas e instancias, no existe un algoritmo que domine en todas las variantes. Para la variante estudiada en este informe, el mejor resultado reportado corresponde a GraphBDSP~\cite{Constantino2017}: en diez instancias de entre 130 y 2.313 tareas, sus soluciones fueron entre 1,6\% y 12\% más baratas que las del SCP con columnas generadas heurísticamente, y quedaron entre 4\% y 16\% por sobre una cota inferior obtenida de un modelo relajado. En instancias de tamaño mediano, GRASP mostró ser competitivo frente al método exacto con una fracción de su tiempo de cómputo~\cite{DeLeone2011a}.
+
+La tendencia actual apunta a hibridar métodos exactos con metaheurísticas y a disponer de instancias públicas para comparar. Kletzander y Musliu~\cite{Kletzander2020} formalizaron reglas austriacas con restricciones de pausa muy complejas, publicaron un conjunto de instancias basadas en casos reales y propusieron una metaheurística que mejoró significativamente las soluciones reales. Sobre ese mismo problema aplicaron luego un método exacto de \emph{branch and price}~\cite{Kletzander2021}, y finalmente lo integraron con búsqueda en vecindades grandes (LNS): la metaheurística destruye parte de la solución y la repara resolviendo el subproblema con CG o \emph{branch and price}, reutilizando las columnas generadas en iteraciones anteriores~\cite{Kletzander2026}. Una línea análoga, con un solo procedimiento exacto de bajo costo, es la del propio GraphBDSP, que usa el problema de asignación como operador de mejora~\cite{Constantino2017}.
+
+\subsection{Síntesis comparativa}
+La Tabla~\ref{tab:resumen} resume los trabajos más representativos, en orden cronológico. Se observa un crecimiento sostenido en el tamaño de las instancias abordadas, en particular por los métodos heurísticos.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{Resumen de enfoques representativos para el BDSP, basado en la revisión de Constantino et al.~\cite{Constantino2017}. El tamaño se informa en tareas o viajes, según lo reportado por cada autor.}
+\label{tab:resumen}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Referencia & Objetivo & Técnica & Instancia mayor \\
+\midrule
+Li y Kwan 2003~\cite{LiKwan2003} & Costo y conductores & Alg. genético difuso & 613 tareas \\
+Yunes et al. 2005~\cite{Yunes2005} & Conductores & CG + prog. por restricciones & 246 tareas \\
+Huisman et al. 2005~\cite{Huisman2005} & Costo & CG + rel. lagrangiana & 653 viajes \\
+De Leone et al. 2011~\cite{DeLeone2011a} & Costo o conductores & MIP, GRASP & 161 viajes \\
+Chen y Shen 2013~\cite{ChenShen2013} & Conductores & SCP + CG & 701 viajes \\
+Li et al. 2015~\cite{Li2015} & Costo y conductores & Hiperheurística + CG & 500 tareas \\
+Ma et al. 2016~\cite{Ma2016} & Costo & VNS & 501 tareas \\
+Constantino et al. 2017~\cite{Constantino2017} & Costo (tiempo pagado) & Asignaciones sucesivas & 2.313 tareas \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+En cuanto a la \textbf{representación}, conviven tres enfoques: (i) conjuntos de turnos preenumerados (columnas), propio de SPP/SCP~\cite{Portugal2009}; (ii) turnos como secuencias de tramos o caminos en un grafo de compatibilidad, usado por GRASP~\cite{DeLeone2011a} y por GraphBDSP~\cite{Constantino2017}; y (iii) asignación directa de cada tramo a un turno, como en el modelo compacto de De Leone et al.~\cite{DeLeone2011a}, que asigna cada tramo a un turno y a una posición dentro de él. En cuanto a los \textbf{movimientos}, destacan el intercambio de tramos entre turnos~\cite{Lourenco2001,DeLeone2011a}, el intercambio de sufijos, que permite fusionar o dividir turnos~\cite{DeLeone2011a}, y la recombinación simultánea de todos los turnos mediante problemas de asignación~\cite{Constantino2017}. Finalmente, el \textbf{manejo de restricciones} se realiza mayoritariamente descartando las soluciones infactibles, ya sea filtrando los turnos durante la generación de columnas o asignándoles costo infinito~\cite{Constantino2017}. Las penalizaciones se reservan para restricciones blandas, como los cambios de línea en~\cite{Constantino2017}.
+
+\section{Modelo Matem\'atico}\label{sec:modelo}
+Se presentan dos modelos. El primero es la formulación clásica de partición de conjuntos, útil como marco general. El segundo es un modelo compacto de programación lineal entera mixta (MILP) propuesto para la variante estudiada; toma como base las reglas y la función de costo de Constantino et al.~\cite{Constantino2017}, quienes indican que no conocen una formulación lineal para ellas, y adapta ideas del modelo de De Leone et al.~\cite{DeLeone2011a}, reemplazando las variables por posición por variables de arco.
+
+\subsection{Modelo 1: partición de conjuntos}
+Siguiendo la formulación clásica del problema~\cite{Portugal2009,DeLeone2011a}, sea $J$ el conjunto de tramos y $\mathcal{P}$ el conjunto de todos los turnos factibles, es decir, aquellos que cumplen todas las reglas de la Sección~\ref{sec:variante}. Para cada $p\in\mathcal{P}$, $c_p$ es su costo (tiempo pagado más penalizaciones) y $a_{jp}=1$ si el turno $p$ contiene el tramo $j$. Con $z_p\in\{0,1\}$ igual a 1 si se usa el turno $p$:
+\begin{align}
+\min \; & \sum_{p\in\mathcal{P}} c_p\, z_p \\
+\text{s.a.}\; & \sum_{p\in\mathcal{P}} a_{jp}\, z_p = 1 && \forall j\in J \label{eq:spp}\\
+& z_p\in\{0,1\} && \forall p\in\mathcal{P}
+\end{align}
+La restricción~\eqref{eq:spp} garantiza que cada tramo sea cubierto exactamente una vez. Al reemplazar ``$=$'' por ``$\geq$'' se obtiene el SCP. El espacio de búsqueda es $2^{|\mathcal{P}|}$, y $|\mathcal{P}|$ crece exponencialmente con $|J|$, lo que motiva el uso de generación de columnas o de enumeración parcial.
+
+\subsection{Modelo 2: MILP compacto para la variante estudiada}
+
+\paragraph{Conjuntos y parámetros.}
+\begin{itemize}
+\item $J=\{1,\dots,n\}$: tramos. Para cada $j\in J$: instante de inicio $s_j$ y término $e_j=s_j+d_j$ (minutos desde las 00:00, con $d_j$ la duración), lugar de partida $a_j$ y de término $b_j$, línea $\ell_j$, y minutos de conducción nocturna $\nu_j=|[s_j,e_j]\cap\mathcal{N}|$, donde $\mathcal{N}=\bigcup_{d\geq 0}[1440d-120,\ 1440d+300)$ es el horario nocturno (22:00 a 05:00) expresado en minutos, de modo que también se consideran los tramos posteriores a la medianoche.
+\item $K=\{1,\dots,m\}$: conductores disponibles ($m\leq n$ es una cota superior, por ejemplo $m=n$).
+\item $A=\{(i,j)\in J\times J : e_i\leq s_j,\ b_i=a_j\}$: pares compatibles, en que el conductor que termina $i$ puede iniciar $j$. Se agregan un nodo origen $0$ y un sumidero $n{+}1$, con arcos $(0,j)$ y $(j,n{+}1)$ para todo $j$. Como $e_i\leq s_j$ y $d_j>0$, el grafo es acíclico.
+\item $g_{ij}=s_j-e_i$: pausa entre $i$ y $j$. $A^R=\{(i,j)\in A: g_{ij}\geq R^{\min}\}$: pausas que pueden ser descanso. $\bar g_{ij}=\min\{g_{ij},R^{\text{pag}}\}$: porción no pagada si la pausa es el descanso.
+\item $\lambda_{ij}=1$ si $\ell_i\neq\ell_j$ (cambio de línea) y 0 en otro caso.
+\item $T^{\max}, R^{\min}, R^{\text{pag}}, P^{\min}, O^{\max}, S^{\max}, f_N, \beta_N, \beta_O, p_L$: parámetros de la Sección~\ref{sec:variante}. $M=\max_{j\in J} e_j$: constante de las restricciones disyuntivas, igual al término del último tramo del día.
+\end{itemize}
+
+\paragraph{Variables.}
+\begin{itemize}
+\item $x_{jk}\in\{0,1\}$: 1 si el tramo $j$ es asignado al conductor $k$.
+\item $y_{ijk}\in\{0,1\}$: 1 si el conductor $k$ realiza el tramo $j$ inmediatamente después de $i$ (incluye arcos desde $0$ y hacia $n{+}1$).
+\item $r_{ijk}\in\{0,1\}$, $(i,j)\in A^R$: 1 si la pausa entre $i$ y $j$ es el descanso del conductor $k$.
+\item $u_k\in\{0,1\}$: 1 si el conductor $k$ es utilizado.
+\item $S_k, E_k\geq 0$: inicio y término del turno $k$.
+\item $W_k\geq 0$: tiempo trabajado del turno $k$, corregido por el factor nocturno.
+\item $O_k\geq 0$: sobretiempo del turno $k$.
+\end{itemize}
+Como supuestos de modelamiento se considera, en concordancia con~\cite{Constantino2017}, que cada turno tiene a lo sumo un descanso no pagado, que las demás pausas son tiempo ocioso pagado, que no se exige volver al punto de partida al final del turno, y que el recargo nocturno se aplica solo a los minutos de conducción, no a las pausas en horario nocturno.
+
+\paragraph{Función objetivo.}
+\begin{equation}
+\min\; \sum_{k\in K}\Big( P^{\min}u_k + (1+\beta_O)\,O_k + \beta_N f_N \sum_{j\in J}\nu_j x_{jk}\Big) + p_L\sum_{k\in K}\sum_{(i,j)\in A}\lambda_{ij}\,y_{ijk}
+\label{eq:fo}
+\end{equation}
+El primer término es el tiempo pagado. Si el tiempo trabajado $W_k$ no supera $P^{\min}$, se paga $P^{\min}$ (la diferencia es tiempo ocioso); si lo supera, se paga $P^{\min}+O_k=W_k$ más el recargo $\beta_O O_k$ del sobretiempo. A ello se suma el recargo nocturno sobre los minutos nocturnos corregidos. El segundo término penaliza los cambios de línea. Esta forma de pago reproduce los ejemplos numéricos de Constantino et al.~\cite{Constantino2017}: un turno de 480 minutos trabajados se paga $432+48\cdot 1{,}5=504$ minutos, y uno de 420 minutos se paga 432.
+
+\paragraph{Restricciones.}
+\begin{align}
+& \sum_{k\in K} x_{jk} = 1 && \forall j\in J \label{r:cob}\\ \sepline
+& \sum_{i:(i,j)\in A\cup\{(0,j)\}} y_{ijk} = x_{jk},\quad \sum_{l:(j,l)\in A\cup\{(j,n+1)\}} y_{jlk} = x_{jk} && \forall j\in J,\ k\in K \label{r:flujo}\\ \sepline
+& \sum_{j\in J} y_{0jk} = u_k,\quad \sum_{j\in J} y_{j,n+1,k} = u_k && \forall k\in K \label{r:uso}\\ \sepline
+& S_k = \sum_{j\in J} s_j\, y_{0jk},\quad E_k=\sum_{j\in J} e_j\, y_{j,n+1,k} && \forall k\in K \label{r:ini}\\ \sepline
+& E_k - S_k \leq S^{\max} && \forall k\in K \label{r:spread}\\ \sepline
+& r_{ijk}\leq y_{ijk} && \forall (i,j)\in A^R,\ k\in K \label{r:rest1}\\ \sepline
+& \sum_{(i,j)\in A^R} r_{ijk}\leq 1 && \forall k\in K \label{r:rest2}\\ \sepline
+& E_k - S_k \geq (T^{\max}+1)\sum_{(i,j)\in A^R} r_{ijk} && \forall k\in K \label{r:restlargo}\\ \sepline
+& E_k - S_k \leq T^{\max} + M\sum_{(i,j)\in A^R} r_{ijk} && \forall k\in K \label{r:sinrest}\\ \sepline
+& e_i - S_k \leq T^{\max} + M(1-r_{ijk}),\quad E_k - s_j \leq T^{\max} + M(1-r_{ijk}) && \forall (i,j)\in A^R,\ k\in K \label{r:stretch}\\ \sepline
+& W_k = E_k - S_k - \sum_{(i,j)\in A^R}\bar g_{ij}\, r_{ijk} + (f_N-1)\sum_{j\in J}\nu_j x_{jk} && \forall k\in K \label{r:trab}\\ \sepline
+& O_k \geq W_k - P^{\min}u_k && \forall k\in K \label{r:ot}\\ \sepline
+& O_k \leq O^{\max} && \forall k\in K \label{r:otmax}\\ \sepline
+& u_k \geq u_{k+1} && k=1,\dots,m-1 \label{r:sim}
+\end{align}
+
+\paragraph{Explicación.}
+\eqref{r:cob} asegura que cada tramo sea realizado por exactamente un conductor, de modo que ningún tramo quede sin cubrir ni sea compartido. \eqref{r:flujo} enlaza la asignación con la secuencia: cada tramo asignado a $k$ tiene exactamente un antecesor y un sucesor en el turno de $k$ (posiblemente el origen o el sumidero). Como los arcos solo existen entre tramos compatibles, esto impone que un conductor no inicie un tramo antes de terminar el anterior ni en un lugar distinto del que se encuentra. \eqref{r:uso} hace que cada conductor utilizado tenga un único camino desde el origen al sumidero; al ser el grafo acíclico, no se requieren restricciones de eliminación de subtours. \eqref{r:ini} define el inicio y el término del turno, que valen 0 para conductores no utilizados, y \eqref{r:spread} limita la duración total del turno (regla 6). \eqref{r:rest1} y \eqref{r:rest2} permiten designar como descanso a lo más una pausa del turno, de largo al menos $R^{\min}$, y \eqref{r:restlargo} solo lo permite si el turno dura más que $T^{\max}$; en caso contrario, todas sus pausas son pagadas, como en~\cite{Constantino2017}. \eqref{r:sinrest} y \eqref{r:stretch} modelan la regla 1: si el turno no tiene descanso, su duración total no puede exceder $T^{\max}$; si lo tiene, tanto el tramo de trabajo anterior como el posterior al descanso deben durar a lo más $T^{\max}$. \eqref{r:trab} calcula el tiempo trabajado como el spreadover menos la parte no pagada del descanso (regla 2), considerando que los minutos nocturnos valen $f_N$ veces (regla 5). \eqref{r:ot} define el sobretiempo como el exceso sobre la jornada; al minimizar, $O_k=\max\{0,W_k-P^{\min}\}$ y así el primer término de~\eqref{eq:fo} implementa la regla 3. \eqref{r:otmax} limita el sobretiempo (regla 4). Por último, \eqref{r:sim} elimina simetrías entre conductores equivalentes, obligando a usar primero los de menor índice.
+
+\paragraph{Espacio de búsqueda.}
+Dado que dentro de un turno el orden de los tramos queda determinado por sus horarios, una solución queda completamente definida por las variables $x_{jk}$; las variables $y$, $r$ y las continuas se derivan de ellas. Por lo tanto, el espacio de búsqueda tiene tamaño $|\Omega|\leq m^{n}$ (o a lo más el número de Bell $B_n$ si se ignora la identidad de los conductores), del cual solo una fracción pequeña es factible. El modelo tiene $O(|A|\,m)=O(n^2m)$ variables binarias y restricciones, lo que, al igual que el modelo de De Leone et al.~\cite{DeLeone2011a}, lo hace práctico solo para instancias pequeñas. Sin embargo, sirve para definir de manera precisa la función de evaluación y las restricciones que deberá manejar un algoritmo de búsqueda.
+
+\section{Conclusiones}\label{sec:conc}
+El estudio muestra que el BDSP no es un problema único, sino una familia de problemas cuyas diferencias provienen principalmente de las reglas laborales de cada país y empresa y del objetivo considerado (costo, número de conductores o ambos). Por ello, las técnicas no resuelven exactamente el mismo problema, y sus resultados son difíciles de comparar: varios trabajos se evalúan con datos de una empresa específica, como los de PluService en~\cite{DeLeone2011a} o los de una empresa brasileña en~\cite{Constantino2017}, y solo recientemente se han publicado conjuntos de instancias de referencia~\cite{Constantino2017,Kletzander2020}.
+
+Las técnicas se agrupan en dos grandes enfoques. Los métodos basados en SPP/SCP y generación de columnas separan limpiamente las reglas (en la generación de turnos) de la optimización y entregan cotas de calidad, pero su costo computacional crece rápidamente, y cuando las columnas se generan de forma heurística pierden la garantía de optimalidad: en~\cite{Constantino2017}, el SCP con columnas truncadas fue superado por una heurística. Las metaheurísticas (GRASP, tabú, genéticos, VNS) y las heurísticas especializadas abordan instancias más grandes, en general de hasta unas 600 tareas y, en el caso de GraphBDSP, de más de 2.000~\cite{Constantino2017}, pero no garantizan optimalidad y dependen fuertemente del diseño de sus movimientos. Las dos fuentes base del curso ilustran bien este contraste dentro de las heurísticas: el GRASP de De Leone et al.~\cite{DeLeone2011a} es estocástico y multiarranque, por lo que su resultado depende de la aleatorización y del número de iteraciones, mientras que GraphBDSP~\cite{Constantino2017} es determinista, tiene un solo parámetro y mejora la solución resolviendo problemas de asignación de forma exacta. En ambos, las reglas de descanso y de pago dependen del turno completo y no son lineales, por lo que los turnos se evalúan mediante una función procedimental y se descartan los infactibles~\cite{DeLeone2011a,Constantino2017}.
+
+En la variante estudiada, el tiempo pagado mínimo cumple un papel central: todo turno se paga por al menos 432 minutos, de modo que los turnos cortos generan un gran tiempo ocioso pagado. En el ejemplo del curso, dos turnos de menos de 200 minutos de trabajo cuestan 864 minutos. En consecuencia, las estrategias más prometedoras son: (i) los movimientos que operan sobre segmentos de turnos, como el intercambio de sufijos~\cite{DeLeone2011a} y la recombinación por asignación~\cite{Constantino2017}, porque permiten fusionar turnos cortos y reducir el tiempo ocioso; (ii) guiar la búsqueda con componentes específicos del costo, como el tiempo ocioso y el sobretiempo, en lugar del tiempo pagado total, lo que dio mejores resultados en~\cite{Constantino2017}; y (iii) los híbridos entre métodos exactos y metaheurísticas, como LNS con reparación por \emph{branch and price}~\cite{Kletzander2026}, que representan la tendencia actual.
+
+El modelo propuesto en la Sección~\ref{sec:modelo} tiene limitaciones: por su tamaño, $O(n^2m)$, solo es práctico para instancias pequeñas, y supone un único descanso por turno y que el conductor no necesita volver al depósito. Aun así, entrega una definición precisa de la función de evaluación y de las restricciones que deberá manejar la implementación de la siguiente entrega. Como trabajo futuro, se propone explorar representaciones de asignación directa tramo--conductor con evaluación incremental del costo, que permiten movimientos baratos y un manejo explícito de las restricciones, ya sea descartando los vecinos infactibles o penalizándolos. También se propone relajar los supuestos del modelo (varios descansos, retorno al depósito), estudiar la reprogramación dinámica ante eventos imprevistos, señalada como ventaja potencial por~\cite{Constantino2017}, y la integración con la etapa de \emph{crew rostering}.
+
+\section{Uso LLMs}
+\begin{enumerate}
+\item \textbf{Herramienta utilizada:} Claude Code (interfaz de línea de comandos de Anthropic), con el modelo Claude Opus 5.5.
+\item \textbf{Prop\'osito de uso}: b\'usqueda exploratoria de literatura sobre BDSP, identificaci\'on de autores y trabajos relevantes, redacci\'on de borradores iniciales para algunas secciones, correcci\'on de estilo y ortograf\'ia.
+\item \textbf{Prompts relevantes}: ``Resumen del estado del arte de Bus Driver Scheduling Problem desde Weaver (1972) hasta heur\'isticas modernas''; ``Formulaci\'on cl\'asica de Set Covering (o Set Partitioning) binario puro generado en dos etapas''; ``Referencias acad\'emicas relevantes''.
+\item \textbf{Nivel de edici\'on}: el contenido entregado por la herramienta fue reescrito, reorganizado y verificado por el autor. Las referencias fueron consultadas individualmente en sus fuentes originales para confirmar autor\'ia, a\~no de publicaci\'on y exactitud de las afirmaciones citadas.
+\item \textbf{Validación:} el contenido se contrastó con los artículos fuente~\cite{DeLeone2011a,Constantino2017} y con la presentación del problema entregada por el ayudante. Los datos bibliográficos de las referencias adicionales se verificaron mediante búsquedas en las páginas de las editoriales (AAAI, JAIR, Elsevier, Taylor \& Francis).
+\end{enumerate}
+
+\bibliographystyle{plain}
+\bibliography{Referencias}
+
+\end{document}
