@@ -1,0 +1,176 @@
+\begin{thebibliography}{10}
+
+\bibitem{Bodin1983}
+Lawrence Bodin, Bruce Golden, Arjang Assad, and Michael Ball.
+\newblock Routing and scheduling of vehicles and crews: the state of the art.
+\newblock {\em Computers \& Operations Research}, 10(2):63--212, 1983.
+
+\bibitem{ChenShen2013}
+Shijun Chen and Yindong Shen.
+\newblock An improved column generation algorithm for crew scheduling problems.
+\newblock {\em Journal of Information and Computational Science},
+  10(1):175--183, 2013.
+
+\bibitem{Constantino2017}
+Ademir~Aparecido Constantino, Candido Ferreira~Xavier de~Mendon{\c{c}}a~Neto,
+  Silvio~Alexandre de~Araujo, Dario Landa-Silva, Rog{\'e}rio Calvi, and
+  Allainclair~Flausino dos Santos.
+\newblock Solving a large real-world bus driver scheduling problem with a
+  multi-assignment based heuristic algorithm.
+\newblock {\em Journal of Universal Computer Science}, 23(5):479--504, 2017.
+
+\bibitem{Curtis1999}
+Suniel~D. Curtis, Barbara~M. Smith, and Anthony Wren.
+\newblock Forming bus driver schedules using constraint programming.
+\newblock Technical Report Report 99.05, University of Leeds, School of
+  Computer Studies, 1999.
+
+\bibitem{DAnnibale2007}
+Gianluca D'Annibale, Renato~De Leone, Paola Festa, and Emilia Marchitto.
+\newblock A new meta-heuristic for the bus driver scheduling problem: {GRASP}
+  combined with rollout.
+\newblock In {\em 2007 IEEE Symposium on Computational Intelligence in
+  Scheduling (CISched 2007)}, pages 192--197, 2007.
+
+\bibitem{DesrochersSoumis1989}
+Martin Desrochers and Fran{\c{c}}ois Soumis.
+\newblock A column generation approach to the urban transit crew scheduling
+  problem.
+\newblock {\em Transportation Science}, 23(1):1--13, 1989.
+
+\bibitem{Dias2002}
+Teresa~Galv{\~a}o Dias, Jorge~Pinho de~Sousa, and Jo{\~a}o~Falc{\~a}o e~Cunha.
+\newblock Genetic algorithms for the bus driver scheduling problem: a case
+  study.
+\newblock {\em Journal of the Operational Research Society}, 53(3):324--335,
+  2002.
+
+\bibitem{FeoResende1995}
+Thomas~A. Feo and Mauricio G.~C. Resende.
+\newblock Greedy randomized adaptive search procedures.
+\newblock {\em Journal of Global Optimization}, 6:109--133, 1995.
+
+\bibitem{Fischetti1987}
+Matteo Fischetti, Silvano Martello, and Paolo Toth.
+\newblock The fixed job schedule problem with spread-time constraints.
+\newblock {\em Operations Research}, 35(6):849--858, 1987.
+
+\bibitem{Fischetti1989}
+Matteo Fischetti, Silvano Martello, and Paolo Toth.
+\newblock The fixed job schedule problem with working-time constraints.
+\newblock {\em Operations Research}, 37(3):395--403, 1989.
+
+\bibitem{Fores2002}
+Sarah Fores, Les Proll, and Anthony Wren.
+\newblock {TRACS II}: a hybrid {IP}/heuristic driver scheduling system for
+  public transport.
+\newblock {\em Journal of the Operational Research Society}, 53(10):1093--1100,
+  2002.
+
+\bibitem{Huisman2005}
+Dennis Huisman, Richard Freling, and Albert P.~M. Wagelmans.
+\newblock Multiple-depot integrated vehicle and crew scheduling.
+\newblock {\em Transportation Science}, 39(4):491--502, 2005.
+
+\bibitem{IbarraRojas2015}
+Omar~J. Ibarra-Rojas, Felipe Delgado, Ricardo Giesen, and Juan~Carlos
+  Mu{\~n}oz.
+\newblock Planning, operation, and control of bus transport systems: A
+  literature review.
+\newblock {\em Transportation Research Part B: Methodological}, 77:38--75,
+  2015.
+
+\bibitem{Kletzander2026}
+Lucas Kletzander, Tommaso~Mannelli Mazzoli, Nysret Musliu, and Pascal~Van
+  Hentenryck.
+\newblock Integrating column generation and large neighborhood search for bus
+  driver scheduling with complex break constraints.
+\newblock {\em Journal of Artificial Intelligence Research}, 85:44:1--44:37,
+  2026.
+\newblock Preprint: arXiv:2505.02485.
+
+\bibitem{Kletzander2020}
+Lucas Kletzander and Nysret Musliu.
+\newblock Solving large real-life bus driver scheduling problems with complex
+  break constraints.
+\newblock In {\em Proceedings of the International Conference on Automated
+  Planning and Scheduling (ICAPS)}, volume~30, pages 421--429, 2020.
+\newblock DOI: 10.1609/icaps.v30i1.6688.
+
+\bibitem{Kletzander2021}
+Lucas Kletzander, Nysret Musliu, and Pascal~Van Hentenryck.
+\newblock Branch and price for bus driver scheduling with complex break
+  constraints.
+\newblock In {\em Proceedings of the AAAI Conference on Artificial
+  Intelligence}, volume~35, pages 11853--11861, 2021.
+
+\bibitem{DeLeone2011a}
+Renato~De Leone, Paola Festa, and Emilia Marchitto.
+\newblock A bus driver scheduling problem: a new mathematical model and a
+  {GRASP} approximate solution.
+\newblock {\em Journal of Heuristics}, 17(4):441--466, 2011.
+\newblock DOI: 10.1007/s10732-010-9141-3.
+
+\bibitem{DeLeone2011b}
+Renato~De Leone, Paola Festa, and Emilia Marchitto.
+\newblock Solving a bus driver scheduling problem with randomized multistart
+  heuristics.
+\newblock {\em International Transactions in Operational Research},
+  18(6):707--727, 2011.
+
+\bibitem{Li2015}
+Huaxin Li, Yu~Wang, Shaohua Li, and Shuo Li.
+\newblock A column generation based hyper-heuristic to the bus driver
+  scheduling problem.
+\newblock {\em Discrete Dynamics in Nature and Society}, 2015:1--10, 2015.
+
+\bibitem{LiKwan2003}
+Jingpeng Li and Raymond S.~K. Kwan.
+\newblock A fuzzy genetic algorithm for driver scheduling.
+\newblock {\em European Journal of Operational Research}, 147(2):334--344,
+  2003.
+
+\bibitem{Lourenco2001}
+Helena~R. Louren{\c{c}}o, Jos{\'e}~P. Paix{\~a}o, and Rita Portugal.
+\newblock Multiobjective metaheuristics for the bus-driver scheduling problem.
+\newblock {\em Transportation Science}, 35(3):331--343, 2001.
+
+\bibitem{Ma2016}
+Jihui Ma, Avishai Ceder, Yang Yang, Tao Liu, and Wei Guan.
+\newblock A case study of {B}eijing bus crew scheduling: a variable
+  neighborhood-based approach.
+\newblock {\em Journal of Advanced Transportation}, 50(4):434--445, 2016.
+
+\bibitem{Portugal2009}
+Rita Portugal, Helena~R. Louren{\c{c}}o, and Jos{\'e}~P. Paix{\~a}o.
+\newblock Driver scheduling problem modelling.
+\newblock {\em Public Transport}, 1(2):103--120, 2009.
+
+\bibitem{ShenKwan2001}
+Yindong Shen and Raymond S.~K. Kwan.
+\newblock Tabu search for driver scheduling.
+\newblock In S.~Vo{\ss} and J.~R. Daduna, editors, {\em Computer-Aided
+  Scheduling of Public Transport}, volume 505 of {\em Lecture Notes in
+  Economics and Mathematical Systems}, pages 121--135. Springer, Berlin,
+  Heidelberg, 2001.
+
+\bibitem{WrenRousseau1995}
+Anthony Wren and Jean-Marc Rousseau.
+\newblock Bus driver scheduling -- an overview.
+\newblock In J.~R. Daduna, I.~Branco, and J.~M.~P. Paix{\~a}o, editors, {\em
+  Computer-Aided Transit Scheduling}, volume 430 of {\em Lecture Notes in
+  Economics and Mathematical Systems}, pages 173--187. Springer, Berlin,
+  Heidelberg, 1995.
+
+\bibitem{WrenWren1995}
+Anthony Wren and Douglas~O. Wren.
+\newblock A genetic algorithm for public transport driver scheduling.
+\newblock {\em Computers \& Operations Research}, 22(1):101--110, 1995.
+
+\bibitem{Yunes2005}
+Tallys~H. Yunes, Arnaldo~V. Moura, and Cid~C. de~Souza.
+\newblock Hybrid column generation approaches for urban transit crew management
+  problems.
+\newblock {\em Transportation Science}, 39(2):273--288, 2005.
+
+\end{thebibliography}

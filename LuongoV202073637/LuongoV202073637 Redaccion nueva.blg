@@ -1,0 +1,49 @@
+This is BibTeX, Version 0.99d (TeX Live 2023)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: LuongoV202073637 Redaccion nueva.aux
+The style file: plain.bst
+Database file #1: Referencias.bib
+Warning--can't use both volume and number fields in Kletzander2020
+Warning--can't use both volume and number fields in Kletzander2021
+You've used 27 entries,
+            2118 wiz_defined-function locations,
+            697 strings with 9496 characters,
+and the built_in function-call counts, 10677 in all, are:
+= -- 1082
+> -- 515
+< -- 10
++ -- 208
+- -- 171
+* -- 847
+:= -- 1736
+add.period$ -- 86
+call.type$ -- 27
+change.case$ -- 164
+chr.to.int$ -- 0
+cite$ -- 29
+duplicate$ -- 363
+empty$ -- 790
+format.name$ -- 171
+if$ -- 2203
+int.to.chr$ -- 0
+int.to.str$ -- 27
+missing$ -- 26
+newline$ -- 141
+num.names$ -- 58
+pop$ -- 125
+preamble$ -- 1
+purify$ -- 137
+quote$ -- 0
+skip$ -- 264
+stack$ -- 0
+substring$ -- 834
+swap$ -- 87
+text.length$ -- 10
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 108
+warning$ -- 2
+while$ -- 113
+width$ -- 29
+write$ -- 313
+(There were 2 warnings)
