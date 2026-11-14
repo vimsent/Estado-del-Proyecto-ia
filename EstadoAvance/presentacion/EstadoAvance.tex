@@ -1,0 +1,458 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-nodecimaldot,es-noquoting]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{babel,arrows.meta,positioning,calc}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.17}
+
+\usetheme{default}
+\usecolortheme{default}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\definecolor{acento}{RGB}{0,98,128}
+\definecolor{acento2}{RGB}{214,110,30}
+\setbeamercolor{frametitle}{fg=acento}
+\setbeamercolor{title}{fg=acento}
+\setbeamercolor{structure}{fg=acento}
+\setbeamerfont{frametitle}{series=\bfseries}
+
+\lstset{language=C++,basicstyle=\ttfamily\scriptsize,keywordstyle=\color{acento}\bfseries,
+  commentstyle=\color{gray},showstringspaces=false,frame=single,rulecolor=\color{gray!40},
+  columns=fullflexible,literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1 {ñ}{{\~n}}1}
+
+\newcommand{\ok}{\textcolor{green!50!black}{\checkmark}}
+
+\title{Estado de Avance\\\large Bus Driver Scheduling Problem con HC-BI + Restart}
+\author{Vicente Luongo \quad ROL 202073637-5}
+\institute{INF295 Inteligencia Artificial -- UTFSM}
+\date{2026-2}
+
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+%---------------------------------------------------------------
+\begin{frame}{Problema y técnica asignada}
+\begin{columns}[T]
+\column{0.55\textwidth}
+\textbf{BDSP} (variante de Constantino et al.~[1]):
+\begin{itemize}
+\item Cubrir cada tramo con \textbf{exactamente un} conductor.
+\item Respetar las reglas laborales: stretch $\le 360$, descanso $\ge 90$, umbral de descanso pagado de 300, sobretiempo $\le 120$, spread $\le 780$.
+\item \textbf{Minimizar el tiempo pagado total}, que incluye el mínimo de 432, el recargo nocturno, el recargo por sobretiempo y la penalización por cambio de línea.
+\end{itemize}
+\column{0.42\textwidth}
+\textbf{Técnica: HC-BI + Restart}
+\begin{itemize}
+\item Representación \emph{ad-hoc}.
+\item Inicialización \textbf{aleatoria}.
+\item Movimientos que permitan visitar todo el espacio de búsqueda.
+\item \emph{Best Improvement}: se explora el vecindario completo y se toma el mejor vecino.
+\item Reinicio al llegar a un óptimo local.
+\end{itemize}
+\end{columns}
+\end{frame}
+
+%---------------------------------------------------------------
+\begin{frame}[fragile]{Estado actual de la implementación (C++17, Linux)}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\begin{tabular}{ll}
+\toprule
+Componente & Estado\\
+\midrule
+Lectura de instancia & \ok\\
+Función de evaluación & \ok\\
+Solución inicial aleatoria & \ok\\
+Escritura de la salida & \ok\\
+HC-BI (vecindarios N1, N2) & \ok{} preliminar\\
+Reinicios y control de tiempo & \ok\\
+Experimentos y ajuste & pendiente\\
+\bottomrule
+\end{tabular}
+
+\vspace{1em}
+Probado con las 10 instancias (130 a 2313 tramos) y con el ejemplo de 6 tramos del curso, que da FO $=864$, la misma cifra del informe.
+\column{0.45\textwidth}
+\begin{lstlisting}[language=bash]
+codigo/
+  Makefile    README.md
+  src/instancia.{h,cpp}   lectura
+  src/evaluacion.{h,cpp}  FO
+  src/solucion.{h,cpp}    repr. +
+                          inicial +
+                          salida
+  src/hillclimbing.{h,cpp}
+  src/main.cpp
+  instancias/
+
+$ make
+$ ./bdsp inst.txt <semilla> <seg> [-v]
+\end{lstlisting}
+\end{columns}
+\end{frame}
+
+%---------------------------------------------------------------
+\begin{frame}[fragile]{Lectura de la instancia y almacenamiento interno}
+\begin{columns}[T]
+\column{0.38\textwidth}
+\textbf{Entrada:}
+\begin{lstlisting}[language=bash]
+130
+"011 ","G","T",6,5,35,12
+"011 ","T","T",6,40,40,12
+...
+360  90  300  432  120
+780  60/52  20  50  1
+\end{lstlisting}
+\begin{itemize}\small
+\item Se toleran CRLF, comillas y espacios.
+\item $f_N$ se lee como fracción ($60/52$).
+\item Si el formato es inválido, el programa da un mensaje de error.
+\end{itemize}
+\column{0.58\textwidth}
+\begin{lstlisting}
+struct Tramo {
+  std::string linea; int lineaId; // línea -> entero
+  int origen, destino;            // lugar -> entero
+  int inicio, fin, duracion;      // minutos desde 00:00
+  int bus;
+  int nocturno;   // nu_j precalculado (22:00-05:00)
+};
+\end{lstlisting}
+\begin{itemize}\small
+\item Hora y minuto se convierten a minutos: $s_j = 60h+m$, $e_j=s_j+d_j$. Las horas $\ge 24$ se aceptan (cruzan la medianoche).
+\item $\nu_j=|[s_j,e_j)\cap\mathcal N|$ con $\mathcal N=\bigcup_d[1440d-120,1440d+300)$: se calcula \textbf{una sola vez} al leer la instancia.
+\item Las líneas y los lugares se mapean a enteros, de modo que las comparaciones cuestan $O(1)$.
+\end{itemize}
+\end{columns}
+\end{frame}
+
+%---------------------------------------------------------------
+\begin{frame}{Representación}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\begin{itemize}
+\item \textbf{Asignación directa tramo $\to$ conductor}, que corresponde a las variables $x_{jk}$ del modelo del informe.
+\item Internamente: \texttt{vector<vector<int>> turnos}; cada turno guarda sus tramos \textbf{ordenados por hora de inicio}.
+\item El orden lo fijan los horarios, así que la asignación define la solución completa: secuencia, descanso, sobretiempo y pago.
+\item Cada turno guarda su evaluación en caché (\texttt{EvalTurno}).
+\item La cobertura exacta está garantizada por construcción, porque cada tramo aparece en un solo turno.
+\end{itemize}
+\column{0.47\textwidth}
+\begin{tikzpicture}[x=0.36cm,y=0.75cm,font=\scriptsize]
+  \draw[->,gray] (0,-0.3) -- (16,-0.3) node[right] {t};
+  \node[left] at (0,2) {$k=1$};
+  \node[left] at (0,1) {$k=2$};
+  \node[left] at (0,0.2) {};
+  \foreach \a/\b/\l in {1/2/5,2/4/6}{\draw[fill=teal!40] (\a,1.8) rectangle (\b,2.2); \node at ({(\a+\b)/2},2) {\l};}
+  \foreach \a/\b/\l in {8/9/1,9/11/2,11/13/3,13/14.5/4}{\draw[fill=acento2!40] (\a,0.8) rectangle (\b,1.2); \node at ({(\a+\b)/2},1) {\l};}
+  \node[align=left,anchor=north west] at (0,-0.6) {\texttt{turnos = \{\{5,6\},\{1,2,3,4\}\}}\\[2pt]
+     \texttt{salida: 1 2 \textbar{} 2 2 \textbar{} 3 2 \textbar{} 4 2 \textbar{} 5 1 \textbar{} 6 1}};
+\end{tikzpicture}
+
+\vspace{0.5em}
+\small Espacio de búsqueda: a lo más el número de Bell $B_n$ (particiones de los tramos).
+\end{columns}
+\end{frame}
+
+%---------------------------------------------------------------
+\begin{frame}{Manejo de restricciones}
+\begin{tabular}{p{0.32\textwidth}p{0.2\textwidth}p{0.4\textwidth}}
+\toprule
+Restricción & Tipo & Cómo se maneja\\
+\midrule
+Cobertura exacta & dura & La garantiza la representación.\\
+No traslape temporal & dura & No se generan vecinos con traslape (búsqueda binaria en $O(\log L)$).\\
+\midrule
+Continuidad espacial ($b_i=a_j$) & blanda & 60 min de violación por salto de lugar.\\
+Spread $\le S^{\max}$ & blanda & Penalización por minuto de exceso.\\
+Stretch $\le T^{\max}$ y descanso $\ge R^{\min}$ & blanda & Se busca una pausa válida; si no hay, se penaliza la menor violación.\\
+Sobretiempo $\le O^{\max}$ & blanda & Penalización por minuto de exceso.\\
+\bottomrule
+\end{tabular}
+
+\vspace{0.8em}
+$\text{costo}(k)=\text{pagado}_k + p_L\cdot\text{cambios}_k + \mathbf{1000}\cdot\text{violación}_k$
+
+\small El peso 1000 es mayor que $P^{\min}=432$, así que siempre conviene más reparar un minuto de violación que ahorrar un turno.
+Las restricciones blandas permiten pasar por soluciones infactibles al mover tramos: por ejemplo, quitar un tramo intermedio de un turno puede romper su continuidad espacial.
+\end{frame}
+
+%---------------------------------------------------------------
+\begin{frame}[fragile]{Función de evaluación (por turno, en $O(L)$)}
+\begin{columns}[T]
+\column{0.47\textwidth}
+\begin{align*}
+\text{spread}_k &= E_k - S_k\\
+\text{desc}_k &= \max_{\text{pausa válida}} \min(g,R^{\text{pag}}) \quad(\text{si spread} > T^{\max})\\
+W_k &= \text{spread}_k - \text{desc}_k + (f_N-1)\,\nu_k\\
+O_k &= \max(0,\ W_k - P^{\min})\\
+\text{pagado}_k &= \max(W_k,P^{\min}) + \beta_O O_k + \beta_N f_N \nu_k
+\end{align*}
+\small Corresponde a la función objetivo del Modelo~2 del informe. Una pausa es válida si dura $\ge R^{\min}$ y deja ambos stretches $\le T^{\max}$. Entre las válidas se elige la que \textbf{maximiza} la parte no pagada.
+
+\vspace{0.3em}
+\textbf{Verificación a mano} (V\_TCCC0130, semilla 3, conductor 1):\\
+spread 530, descanso 120, $\nu=20$:\\
+$W=413{,}1$; pagado $=432+0{,}2\cdot\frac{60}{52}\cdot20=436{,}6$ \ok
+\column{0.5\textwidth}
+\begin{lstlisting}
+EvalTurno evaluarTurno(const Instancia& I,
+                       const vector<int>& turno) {
+  ...
+  if (r.spread > P.maxStretch) {   // regla 1-2
+    for (cada pausa g entre a y a+1) {
+      v = max(0, Rmin - g)
+        + max(0, (fin_a - S) - Tmax)
+        + max(0, (E - ini_a1) - Tmax);
+      if (v == 0) mejor = max(mejor, min(g, Rpag));
+      else        menorV = min(menorV, v);
+    }
+    ...
+  }
+  r.trabajado  = spread - descanso + (fN-1)*noct;
+  r.sobretiempo = max(0.0, r.trabajado - Pmin);
+  r.pagado = max(r.trabajado, Pmin)
+           + bO*r.sobretiempo + bN*fN*noct;
+  r.costo = r.pagado + pL*cambios
+          + PESO_VIOLACION*r.violacion;
+}
+\end{lstlisting}
+\end{columns}
+\end{frame}
+
+%---------------------------------------------------------------
+\begin{frame}{Solución inicial aleatoria}
+\begin{columns}[T]
+\column{0.52\textwidth}
+\begin{enumerate}
+\item Se baraja el orden de los tramos (\texttt{std::shuffle} con la semilla dada).
+\item Para cada tramo $j$, en ese orden:
+  \begin{itemize}
+  \item se calculan los \emph{candidatos}: los turnos donde $j$ cabe sin traslape \textbf{y} sin violar ninguna regla;
+  \item si hay candidatos, se elige uno \textbf{al azar} (uniforme);
+  \item si no hay, se abre un conductor nuevo.
+  \end{itemize}
+\end{enumerate}
+\vspace{0.5em}
+\begin{itemize}\small
+\item Siempre entrega una solución \textbf{factible}, por lo que el HC parte desde la región factible.
+\item Es aleatoria y no \emph{greedy}: no elige el mejor candidato, sino uno cualquiera. Así cada reinicio parte de un punto distinto.
+\item Costo $O(n\cdot m\cdot L)$: menos de 0,03 s incluso con 2313 tramos.
+\end{itemize}
+\column{0.45\textwidth}
+\begin{tikzpicture}[font=\scriptsize,node distance=0.45cm,
+  b/.style={draw,rounded corners,fill=acento!10,minimum width=4.2cm,align=center}]
+  \node[b] (a) {barajar tramos};
+  \node[b,below=of a] (b) {siguiente tramo $j$};
+  \node[b,below=of b] (c) {candidatos = turnos donde\\$j$ cabe y todo es factible};
+  \node[b,below=of c] (d) {¿hay candidatos?};
+  \node[b,below left=0.5cm and -1.6cm of d,minimum width=1.8cm] (e) {elegir uno\\al azar};
+  \node[b,below right=0.5cm and -1.6cm of d,minimum width=1.8cm] (f) {conductor\\nuevo};
+  \draw[-Stealth] (a)--(b); \draw[-Stealth] (b)--(c); \draw[-Stealth] (c)--(d);
+  \draw[-Stealth] (d)--node[left]{sí}(e); \draw[-Stealth] (d)--node[right]{no}(f);
+\end{tikzpicture}
+\end{columns}
+\end{frame}
+
+%---------------------------------------------------------------
+\begin{frame}{Algoritmo: Hill-Climbing Best Improvement + Restart}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\begin{tabbing}
+\quad\=\quad\=\quad\=\kill
+\textbf{mientras} quede tiempo:\\
+\> $s \leftarrow$ \textsc{InicialAleatoria}()\\
+\> \textbf{repetir}\\
+\>\> $s' \leftarrow \arg\min_{v\in N_1(s)\cup N_2(s)} f(v)$\\
+\>\> \textbf{si} $f(s') < f(s)$: $s\leftarrow s'$\\
+\> \textbf{hasta} que no haya mejora (óptimo local)\\
+\> \textbf{si} $f(s)<f(s^*)$: $s^*\leftarrow s$\\
+\textbf{retornar} $s^*$
+\end{tabbing}
+\column{0.47\textwidth}
+\begin{itemize}
+\item \textbf{Best Improvement}: se evalúan \emph{todos} los vecinos de $N_1$ y $N_2$ antes de mover.
+\item \textbf{Evaluación incremental}: un movimiento solo cambia 2 turnos, así que\\
+$\Delta=f(A')+f(B')-f(A)-f(B)$, con $f(A),f(B)$ guardados en caché.
+\item Solo se aceptan mejoras estrictas.
+\item Criterio de término: tiempo máximo o número de reinicios (parámetros).
+\item Iteraciones informadas = movimientos aplicados en total.
+\end{itemize}
+\end{columns}
+\end{frame}
+
+%---------------------------------------------------------------
+\begin{frame}{Movimiento N1: Mover un tramo}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\begin{tikzpicture}[x=0.4cm,y=0.8cm,font=\scriptsize]
+  \node[left] at (0,2) {A}; \node[left] at (0,1) {B};
+  \foreach \a/\b/\l in {1/3/a1,3.5/6/a2,6.5/8/j,10/12/a3}{\draw[fill=teal!35] (\a,1.8) rectangle (\b,2.2); \node at ({(\a+\b)/2},2) {\l};}
+  \foreach \a/\b/\l in {2/4.5/b1,9/11/b2}{\draw[fill=acento2!35] (\a,0.8) rectangle (\b,1.2); \node at ({(\a+\b)/2},1) {\l};}
+  \draw[-Stealth,thick,red] (7.25,1.75) to[bend right=20] (7.25,1.25);
+  \draw[dashed,red] (6.5,0.8) rectangle (8,1.2);
+  \node[right] at (0,0.1) {$|N_1| = n\cdot(m+1)$ (incluye un turno vacío nuevo)};
+\end{tikzpicture}
+\column{0.47\textwidth}
+\textbf{¿Por qué?}
+\begin{itemize}
+\item \textbf{Conectividad}: con N1 se puede llegar desde cualquier asignación a cualquier otra (por ejemplo, pasando por ``un conductor por tramo''). Así se cumple que los movimientos permitan visitar todo el espacio de búsqueda.
+\item Es el ajuste fino: reubica tramos sueltos para equilibrar turnos o vaciar uno corto.
+\item Si el destino tiene traslape, el vecino no se genera.
+\end{itemize}
+\end{columns}
+\end{frame}
+
+%---------------------------------------------------------------
+\begin{frame}{Movimiento N2: Cruce (intercambio de sufijos, 2-opt*)}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\begin{tikzpicture}[x=0.4cm,y=0.8cm,font=\scriptsize]
+  \node[left] at (0,3) {A}; \node[left] at (0,2) {B};
+  \foreach \a/\b in {1/3,3.5/5.5}{\draw[fill=teal!35] (\a,2.8) rectangle (\b,3.2);}
+  \foreach \a/\b in {8/10,10.5/12}{\draw[fill=teal!15,dashed] (\a,2.8) rectangle (\b,3.2);}
+  \foreach \a/\b in {2/4,4.5/6.5}{\draw[fill=acento2!35] (\a,1.8) rectangle (\b,2.2);}
+  \foreach \a/\b in {7/9.5,13/14}{\draw[fill=acento2!15,dashed] (\a,1.8) rectangle (\b,2.2);}
+  \draw[red,thick] (6.8,1.6) -- (6.8,3.4) node[above] {corte};
+  \node[left] at (0,0.9) {A'}; \node[left] at (0,0.1) {B'};
+  \foreach \a/\b in {1/3,3.5/5.5}{\draw[fill=teal!35] (\a,0.7) rectangle (\b,1.1);}
+  \foreach \a/\b in {7/9.5,13/14}{\draw[fill=acento2!15,dashed] (\a,0.7) rectangle (\b,1.1);}
+  \foreach \a/\b in {2/4,4.5/6.5}{\draw[fill=acento2!35] (\a,-0.1) rectangle (\b,0.3);}
+  \foreach \a/\b in {8/10,10.5/12}{\draw[fill=teal!15,dashed] (\a,-0.1) rectangle (\b,0.3);}
+\end{tikzpicture}
+
+\small $A'=A[0..i)+B[k..]$, $B'=B[0..k)+A[i..]$. El corte $k$ se calcula a partir de $i$, así que $|N_2|=O(m^2 L)$.
+\column{0.47\textwidth}
+\textbf{¿Por qué?}
+\begin{itemize}
+\item Se basa en el intercambio de sufijos de De Leone et al.~[2] y en la recombinación de segmentos de Constantino et al.~[1].
+\item Mueve \textbf{bloques completos} de trabajo en un solo paso, cosa que N1 necesitaría varios pasos para lograr, y varios de esos pasos empeoran el costo.
+\item Si $B[0..k)$ queda vacío, B desaparece. Así se \textbf{fusionan turnos cortos}, que es lo que más ahorra porque cada turno cuesta al menos 432.
+\item Mantiene juntos los encadenamientos de un mismo bus, lo que conserva la continuidad espacial.
+\end{itemize}
+\end{columns}
+\end{frame}
+
+%---------------------------------------------------------------
+\begin{frame}[fragile]{Salida y resultados preliminares}
+\begin{columns}[T]
+\column{0.3\textwidth}
+\begin{lstlisting}[language=bash]
+9681.08 30.001 1 77343
+
+1 12
+2 12
+3 12
+...
+130 6
+\end{lstlisting}
+\small \texttt{<FO> <tiempo> <semilla> <iter>}, luego \texttt{<tramo> <conductor>}. Se escribe en stdout y en \texttt{salidas/}.
+\column{0.67\textwidth}
+\scriptsize
+\begin{tabular}{lrrrrrr}
+\toprule
+& \multicolumn{2}{c}{Inicial aleatoria} & \multicolumn{2}{c}{HC-BI + Restart (30 s)} & & \\
+Instancia & cond. & FO & cond. & FO & mejora & reinicios\\
+\midrule
+V\_TCCC0130 & 27 & 13\,341,8 & 22 & 9\,681,1 & 27,4\% & 1178\\
+V\_TCCC0251 & 49 & 24\,656,4 & 46 & 20\,228,7 & 18,0\% & 151\\
+v\_cv412    & 81 & 40\,967,6 & 80 & 35\,318,9 & 13,8\% & 36\\
+V\_TCCC0512 & 94 & 48\,385,5 & 93 & 40\,872,6 & 15,5\% & 17\\
+V\_TCCC0761 & 134 & 70\,141,1 & 133 & 58\,596,0 & 16,5\% & 5\\
+V\_TCCC1000 & 172 & 90\,485,6 & 172 & 76\,267,8 & 15,7\% & 3\\
+\bottomrule
+\end{tabular}
+
+\vspace{0.3em}
+\small Semilla 1. Todas las soluciones son factibles.
+\begin{tikzpicture}
+\begin{axis}[ybar,height=3.3cm,width=0.95\textwidth,bar width=7pt,
+  symbolic x coords={130,251,412,512,761,1000},xtick=data,
+  ylabel={\scriptsize mejora (\%)},xlabel={\scriptsize tramos},ymin=0,ymax=34,
+  tick label style={font=\scriptsize},nodes near coords,
+  every node near coord/.append style={font=\tiny},enlarge x limits=0.1]
+\addplot[fill=acento!60] coordinates {(130,27.4) (251,18.0) (412,13.8) (512,15.5) (761,16.5) (1000,15.7)};
+\end{axis}
+\end{tikzpicture}
+\end{columns}
+\end{frame}
+
+%---------------------------------------------------------------
+\begin{frame}{Problemas encontrados y dudas}
+\textbf{1. Meseta generada por el tiempo pagado mínimo.}
+\begin{itemize}\small
+\item Un turno con $W<432$ cuesta 432 sin importar cuántos tramos tenga. Quitarle tramos no mejora $f$ hasta que queda \emph{vacío}, y el HC-BI se estanca.
+\item Por eso, en las instancias grandes casi no baja el número de conductores (172 $\to$ 172).
+\item \textbf{Propuesta}: agregar un término secundario de desempate que premie vaciar los turnos cortos, por ejemplo $-\epsilon\sum_k W_k^2$, guiando la búsqueda por el tiempo ocioso como recomiendan Constantino et al.~[1].
+\end{itemize}
+\textbf{2. Costo de una iteración en instancias grandes.}
+\begin{itemize}\small
+\item Explorar $N_1\cup N_2$ completo cuesta $O(nmL + m^2L^2)$. En 2313 tramos, un solo descenso no termina en 20 s.
+\item \textbf{Propuesta}: podar por ventana temporal, es decir, solo considerar turnos que se solapen en el tiempo con el tramo o el corte.
+\end{itemize}
+\textbf{Dudas para el ayudante}
+\begin{itemize}\small
+\item ¿La FO de la salida debe incluir la penalización por cambio de línea? Por ahora sí la incluye.
+\item ¿Se admite más de un descanso no pagado por turno? Por ahora se supone uno, igual que en el informe.
+\end{itemize}
+\end{frame}
+
+%---------------------------------------------------------------
+\begin{frame}{Conclusiones y trabajo restante}
+\textbf{Conclusiones}
+\begin{itemize}
+\item Ya funcionan la lectura, la evaluación, la solución inicial, la salida y una primera versión del HC-BI con reinicios, en todas las instancias.
+\item La asignación directa con evaluación por turno en caché hace que cada vecino cueste $O(L)$.
+\item El HC-BI mejora entre 14\% y 27\% sobre la solución inicial, pero la meseta de $P^{\min}$ limita la reducción de conductores.
+\end{itemize}
+\textbf{Trabajo restante (Entrega 2, 23 de noviembre)}
+\begin{enumerate}
+\item Término de desempate para escapar de la meseta de $P^{\min}$.
+\item Poda de vecindarios para las instancias grandes (1253 a 2313 tramos).
+\item Incorporar la retroalimentación de esta presentación.
+\item Experimentos: varias semillas, comparación de $N_1$, $N_2$ y $N_1\cup N_2$, y comparación con los resultados de la literatura~[1].
+\item Informe 2: representación, algoritmo, experimentos y resultados.
+\end{enumerate}
+\end{frame}
+
+%---------------------------------------------------------------
+\begin{frame}[fragile]{Uso de LLMs}
+\small
+\textbf{Herramienta:} Claude Code (Anthropic, modelo Claude Opus 5.5), como asistente de
+programación bajo mi especificación y revisión.
+
+\begin{itemize}
+\item \textbf{Mis decisiones de diseño:} representación (asignación directa
+      tramo$\to$conductor), inicialización aleatoria no-greedy, vecindarios N1 y N2,
+      y \texttt{PESO\_VIOLACION}$=1000>432$ para que reparar una violación siempre
+      convenga más que ahorrar un turno.
+\item \textbf{Del asistente:} redacción del código C++ a partir de esa especificación,
+      el \texttt{Makefile}, el \texttt{README} y borradores de estas diapositivas.
+\item \textbf{Mi revisión:} ajuste del código, verificación a mano del pago nocturno
+      (V\_TCCC0130, semilla~3, conductor~1), detección de la meseta de $P^{\min}$ y del
+      costo por iteración en instancias grandes, y formulación de las dos mejoras
+      propuestas.
+\item \textbf{Validación:} ejemplo de 6 tramos (FO$=864$) y las 10 instancias.
+\end{itemize}
+\end{frame}
+
+%---------------------------------------------------------------
+\begin{frame}{Referencias}
+\small
+\begin{enumerate}
+\item[{[1]}] A. A. Constantino, C. F. X. Mendonça, S. A. Araujo, D. Landa-Silva, R. Calvi, A. F. Santos. \emph{Solving a Large Real-world Bus Driver Scheduling Problem with a Multi-assignment based Heuristic Algorithm}. Journal of Universal Computer Science, 23(5):479--504, 2017.
+\item[{[2]}] R. De Leone, P. Festa, E. Marchitto. \emph{A Bus Driver Scheduling Problem: a new mathematical model and a GRASP approximate solution}. Journal of Heuristics, 17:441--466, 2011.
+\item[{[3]}] L. Kletzander, N. Musliu. \emph{Solving Large Real-Life Bus Driver Scheduling Problems with Complex Break Constraints}. ICAPS, 2020.
+\end{enumerate}
+\end{frame}
+
+\end{document}
